@@ -25,8 +25,12 @@ mech.x = 0
 mech.y = 0
 mech.sprx = 20
 mech.spry = 11
-mech.battery = 1
+mech.battery = 10
 mech.hull = 10
+mech.inv_time = 2
+mech.inv_timer = 0
+mech.invulnerable = false
+mech.height = 16 -- todo: check this value
 
 bullets = {} -- {x, y, dir}
 enemies = {} -- {x, y, frame, maxframes, height, dir, animated, sprite}
@@ -50,7 +54,7 @@ function _update()
 	mech.battery = mech.battery - 0.1
 	if(intro) then
 	else
-		mech_update()
+		mech_update(current_t)
 		char_update(current_t)
 
 		--bullet update
@@ -71,15 +75,25 @@ function _update()
 		--enemy update
 		for enemy in all(enemies) do
 			enemy.x = enemy.x - 0.5
-			-- todo: check collisions with mech/char for damage
+			-- char collision
+			-- todo: upper head doesn't seem to collide?
 			if(not char.inside) then
-				-- char
+				if(char.x+4 > enemy.x and char.x+4 < enemy.x+8) then
+					if((enemy.y > char.y and enemy.y < char.y+16) or (enemy.y + enemy.height > char.y and enemy.y + enemy.height < char.y+16)) then
+						char_take_damage()
+					end
+				end
 			end
 
-			-- mech
+			-- mech collision
+			if(mech.sprx+4 > enemy.x and mech.sprx+4 < enemy.x+8) then
+				if((enemy.y > mech.spry and enemy.y < mech.spry+mech.height) or (enemy.y + enemy.height > mech.spry and enemy.y + enemy.height < mech.spry+mech.height)) then
+					mech_take_damage()
+				end
+			end
 
-			-- todo: check collisions to kill enemies
-			-- check bullet collisions here
+
+			-- checking bullet collisions here
 			-- probably less bullets than enemies
 			for bullet in all(bullets) do
 				if(bullet.x+6 > enemy.x+2 and bullet.x+5 < (enemy.x+8)) then
@@ -90,32 +104,29 @@ function _update()
 					end
 				end
 			end
-
-			-- TODO: upper head doesn't seem to collide?
-			if(not char.inside) then
-				if(char.x+4 > enemy.x and char.x+4 < enemy.x+8) then
-					if((enemy.y > char.y and enemy.y < char.y+16) or (enemy.y + enemy.height > char.y and enemy.y + enemy.height < char.y+16)) then
-						char_take_damage()
-					end
-				end
-			end
 		end
 	end
 end
 
-function mech_update()
-	-- todo: only move if player is in side
+function mech_update(current_t)
 	if(mech.battery > 0 and char.inside) then
 		mech.sprx = mech.sprx + 1
+		-- todo: shooting etc
 	elseif(char.inside) then
 		char.x = mech.sprx+5
 		char.y = mech.spry
 		char.speed.y = -3
 		char.inside = false
 	end
+
+	if(current_t - mech.inv_timer >= mech.inv_time) then
+		mech.invulnerable = false
+	end
 end
 
 function char_update(current_t)
+	if(char.inside) then return end -- character doesn't interact inside mech
+	
 	if(btn(0, 0)) then
 		char.speed.x = -1
 		char.flipx = true
@@ -255,13 +266,21 @@ function char_take_damage()
 	if(not char.invulnerable) then
 		char.hp = char.hp - 1
 		sfx(3)
-		char_set_inv()
+		set_inv(char)
 	end
 end
 
-function char_set_inv()
-	char.invulnerable = true
-	char.inv_timer = time()
+function mech_take_damage()
+	if(not mech.invulnerable) then
+		mech.hull = mech.hull - 1
+		sfx(3)
+		set_inv(mech)
+	end
+end
+
+function set_inv(obj)
+	obj.invulnerable = true
+	obj.inv_timer = time()
 end
 
 function char_shoot()
@@ -311,23 +330,30 @@ function game_draw()
 	frame = (frame + step) % #frames1
 	
 	--mech
-	spr(71, mech.sprx, mech.spry+7, 1, 2)
-	spr(69, mech.sprx, mech.spry, 1, 2)
-	if(char.inside) then
-		spr(88, mech.sprx, mech.spry)
-	else
-		spr(89, mech.sprx, mech.spry-8)
+	local mech_inv_draw = true
+	if(mech.invulnerable and step == 0) then
+		mech_inv_draw = false
 	end
-	spr(70, mech.sprx, mech.spry+7, 1, 2)
-	spr(72, mech.sprx, mech.spry+4)
+	if(mech_inv_draw) then
+		spr(71, mech.sprx, mech.spry+7, 1, 2)
+		spr(69, mech.sprx, mech.spry, 1, 2)
+		if(char.inside) then
+			spr(88, mech.sprx, mech.spry)
+		else
+			spr(89, mech.sprx, mech.spry-8)
+		end
+		spr(70, mech.sprx, mech.spry+7, 1, 2)
+		spr(72, mech.sprx, mech.spry+4)
+		spr(73, mech.sprx-1, mech.spry-2)
+	end
 	
 	--character
-	local inv_draw = true
+	local char_inv_draw = true
 	if(char.invulnerable and step == 0) then
-		inv_draw = false
+		char_inv_draw = false
 	end
 
-	if(not char.inside and inv_draw) then
+	if(not char.inside and char_inv_draw) then
 		if(char.aiming) then
 			spr(65, char.x, char.y, 1, 1, char.flipx)
 			spr(96, char.x, char.y+8, 1, 1, char.flipx)
@@ -418,21 +444,21 @@ __gfx__
 00000000000000044000000400000004000000040000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000000040000000500000005000000040000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000400000000000000000000044000000040000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-0000000000000000000000000000000000000000006600000000000000000000000dd00000000000000000000000000000000000000000000040040000000000
-000000000000000000000000000000000000000006666000000000000000000000ddd0000000000000bb00000000000000bb000000000000004004000da55dd0
-000ff000000000000000000000000000000ff0006666600000000000555000000dd00000000000000b0bb00000bb00000b0bb00000000000004444000d5aa5d0
-00ffff00000ff000000ff000000ff00000ffff006666600000ddd000555500000dddd000000000000bb0bb000b0bb0000bb0bb0000000000004004000555aa50
-00fcfc0000ffff0000ffff0000ffff0000fcfc006666600000dddd005555000000dddddd000000000bbbb0000bb0bb000bbbb0000000000000400400055aa550
-00ffff0000fcfc0000fcfc0000fcfc0000ffff006666600000dddd000555500000000000000000000bbbb0000bbbb0000bbbb000000000000040040005aa5550
-000ff00000ffff0000ffff0000ffff00000ff00066666000000dddd00055550000000000000000000bb0b0000bbbb0000bb0b00000000000004444000d5aa5d0
+000000000000000000000000000000000000000000660000000000000000000000dd000005000000000000000000000000000000000000000040040000000000
+000000000000000000000000000000000000000006666000000000000000000000dd00005050000000bb00000000000000bb000000000000004004000da55dd0
+000ff000000000000000000000000000000ff0006666000000000000555000000ddd0000505000000b0bb00000bb00000b0bb00000000000004444000d5aa5d0
+00ffff00000ff000000ff000000ff00000ffff006666000000ddd000555500000dddddd065d000000bb0bb000b0bb0000bb0bb0000000000004004000555aa50
+00fcfc0000ffff0000ffff0000ffff0000fcfc006666000000dddd00555500000ddddddd66d000000bbbb0000bb0bb000bbbb0000000000000400400055aa550
+00ffff0000fcfc0000fcfc0000fcfc0000ffff006666000000dddd00055550000000000066d000000bbbb0000bbbb0000bbbb000000000000040040005aa5550
+000ff00000ffff0000ffff0000ffff00000ff00066666000000dddd00055550000000000060000000bb0b0000bbbb0000bb0b00000000000004444000d5aa5d0
 00c55000000ff000000ff000000ff00000c55000666666000000dddd0005550000000000000000000000b0000bb0b0000000b00000000000004004000dd55ad0
 0cc5510000c550000cc5500000c5500000c551006666660000000ddd000055000000cc000c000000003bb000003bb000003bb000000000000000000000000000
 0cc551000ccc51000cc5510000c551000c55510066666600000000dd0005500000000cc00cc0000000b3b00000b3b00000b3b000000000000000000000000000
-0c55510000ccc10000cc510000cc5100cc5551006666660000000dd00055000000000cccccc000000bb3b0000bb3b0000bb3b000000000000000000000000000
-00333300005c510000c5510000c551000c555100666666000000dd000550000000000cccccc000000bb3b0000bb3b0000bb3b000000000000000000000000000
-003333300033333000333330003330000033330066666600000dd0005500000000000cccccc000000bbbb0000bbbb0000bbbb000000000000000000000000000
-00330330333333300033333303333000003333006666660000dd00005555500000000cccccc0000000b0b00000b0b00000b0b000000000000000000000000000
-00330330333003300330003303333300003333000666600000ddddd00000000000000cc00cc000000b000b0000bb0000bb00b000000000000000000000000000
+0c55510000ccc10000cc510000cc5100cc5551006666660000000dd0005500000000cccccccc00000bb3b0000bb3b0000bb3b000000000000000000000000000
+00333300005c510000c5510000c551000c555100666666000000dd00055000000000cccccccc00000bb3b0000bb3b0000bb3b000000000000000000000000000
+003333300033333000333330003330000033330006666600000dd000550000000000cccccccc00000bbbb0000bbbb0000bbbb000000000000000000000000000
+00330330333333300033333303333000003333000666660000dd0000555550000000cccccccc000000b0b00000b0b00000b0b000000000000000000000000000
+00330330333003300330003303333300003333000066600000ddddd00000000000000cc00cc000000b000b0000bb0000bb00b000000000000000000000000000
 0033033000000330033000000000330000333000000000000000000000000000000000c000cc00000b000b00000b00000000b000000000000000000000000000
 0cc550000000000000000000000000000000000000000000000000000000000000000000000000000000900000000000aa000000000000000000000000000000
 0cccc550000009800000000000000000000000000000000000000000000000000000000000000000aa990000aa999000aa900000000000000000000000000000
