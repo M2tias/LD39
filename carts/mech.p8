@@ -25,7 +25,7 @@ mech.x = 0
 mech.y = 0
 mech.sprx = 20
 mech.spry = 11
-mech.battery = 10
+mech.battery = 1
 mech.hull = 10
 
 bullets = {} -- {x, y, dir}
@@ -55,7 +55,7 @@ function _update()
 
 		--bullet update
 		for bullet in all(bullets) do
-			debug_text = bullet.dir 
+			--debug_text = bullet.dir 
 			if(bullet.dir) then
 				bullet.x = bullet.x - 2
 			else
@@ -87,6 +87,15 @@ function _update()
 						del(enemies, enemy)
 						del(bullets, bullet)
 						sfx(2)
+					end
+				end
+			end
+
+			-- TODO: upper head doesn't seem to collide?
+			if(not char.inside) then
+				if(char.x+4 > enemy.x and char.x+4 < enemy.x+8) then
+					if((enemy.y > char.y and enemy.y < char.y+16) or (enemy.y + enemy.height > char.y and enemy.y + enemy.height < char.y+16)) then
+						char_take_damage()
 					end
 				end
 			end
@@ -198,7 +207,7 @@ function char_down()
 	--debug_p = {x = x, y = y}
 	local tile = mget(x/8, y/8)
 	local ladder = fget(tile, 1)
-	debug_text = ladder
+	--debug_text = ladder
 	if(ladder) then
 		char.y = char.y + 1
 	else
@@ -237,7 +246,13 @@ function char_spikes()
 	local tile = mget(x/8, y/8)
 	local flag = fget(tile, 3)
 
-	if(flag and not char.invulnerable) then
+	if(flag) then
+		char_take_damage()
+	end
+end
+
+function char_take_damage()
+	if(not char.invulnerable) then
 		char.hp = char.hp - 1
 		sfx(3)
 		char_set_inv()
@@ -338,8 +353,7 @@ function game_draw()
 
 	--spr(80+frames2[frame+1], char.x, 88, flip)
 	camera()
-	--todo: ui as sprites here
-	--battery/etc levels
+	
 	palt(0, false)
 	sspr(0, 8, 8, 8, 0, 120, 128, 8)
 	palt(0, true)
