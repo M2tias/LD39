@@ -4,13 +4,17 @@ __lua__
 char = {}
 char.x = 50
 char.y = 5
-char.inside = false
+char.inside = true
 char.speed = {}
 char.speed.x = 0
 char.speed.y = 0
 char.flipx = false
 char.jump = false
 char.hp = 10
+
+cam = {}
+cam.x = 64
+cam.y = 64
 
 -- mech is both an entity and the pannin camera coordinates
 mech = {}
@@ -22,7 +26,7 @@ mech.battery = 10
 mech.hull = 10
 
 bullets = {} -- {x, y, dir}
-enemies = {} -- {x, y, frame}
+enemies = {} -- {x, y, frame, maxframes, height, dir}
 
 
 intro = false
@@ -41,19 +45,59 @@ function _update()
 	end
 	mech.battery = mech.battery - 0.1
 	if(intro) then
-	elseif(char.inside) then
-		mech_update()
 	else
+		mech_update()
 		char_update()
-	end
 
-	for bullet in all(bullets) do
-		debug_text = bullet.dir 
-		if(bullet.dir) then
-			bullet.x = bullet.x - 2
-		else
-			bullet.x = bullet.x + 2
+		--bullet update
+		for bullet in all(bullets) do
+			debug_text = bullet.dir 
+			if(bullet.dir) then
+				bullet.x = bullet.x - 2
+			else
+				bullet.x = bullet.x + 2
+			end
+
+			-- delete bullets that are not visible
+			if(bullet.x < cam.x or bullet.x > (cam.x + 128)) then
+				del(bullets, bullet)
+			end
 		end
+
+		--enemy update
+		for enemy in all(enemies) do
+			enemy.x = enemy.x - 0.5
+			-- todo: check collisions with mech/char for damage
+			if(not char.inside) then
+				-- char
+			end
+
+			-- mech
+
+			-- todo: check collisions to kill enemies
+			-- check bullet collisions here
+			-- probably less bullets than enemies
+			for bullet in all(bullets) do
+				if(bullet.x+6 > enemy.x+2 and bullet.x+5 < (enemy.x+8)) then
+					if(bullet.y+1 > enemy.y and bullet.y+1 < enemy.y+8*enemy.height) then
+						del(enemies, enemy)
+						del(bullets, bullet)
+					end
+				end
+			end
+		end
+	end
+end
+
+function mech_update()
+	-- todo: only move if player is in side
+	if(mech.battery > 0 and char.inside) then
+		mech.sprx = mech.sprx + 1
+	elseif(char.inside) then
+		char.x = mech.sprx+5
+		char.y = mech.spry
+		char.speed.y = -3
+		char.inside = false
 	end
 end
 
@@ -86,7 +130,7 @@ function char_update()
 		char.aiming = true
 		char_shoot()
 	elseif(btnp(5, 0)) then
-		create_enemy()
+		create_ground_enemy()
 	end
 	
 	char_gravity()
@@ -182,8 +226,8 @@ function char_shoot()
 	sfx(1)
 end 
 
-function create_enemy()
-	local enemy = {x = 10+char.x, y = 10, dir = false, frame = 0, maxframes = 3}
+function create_ground_enemy()
+	local enemy = {x = 10+char.x, y = char.y, dir = false, frame = 0, maxframes = 3, dir = false, height = 2}
 	add(enemies, enemy)
 end
 
@@ -202,7 +246,16 @@ end
 function game_draw()
 	cls()
 	mech.x = mech.x + 0.1
-	camera(char.x-40, char.y-40) --todo hysteresis on char.y
+	if(char.inside) then
+		cam.x = mech.sprx-40
+		cam.y = mech.spry-40
+		camera(cam.x, cam.y) --todo hysteresis
+	else
+		cam.x = char.x-40
+		cam.y = char.y-40
+		camera(cam.x, cam.y) --todo hysteresis
+	end
+
 	map(0, 0, 0, 0, 128, 32)
 	--map(mech.x, mech.y, 0, 0, 16, 16)
 	--debug/animation stuff
@@ -212,16 +265,22 @@ function game_draw()
 	--mech
 	spr(71, mech.sprx, mech.spry+7, 1, 2)
 	spr(69, mech.sprx, mech.spry, 1, 2)
-	spr(88, mech.sprx, mech.spry)
+	if(char.inside) then
+		spr(88, mech.sprx, mech.spry)
+	else
+		spr(89, mech.sprx, mech.spry-8)
+	end
 	spr(70, mech.sprx, mech.spry+7, 1, 2)
 	spr(72, mech.sprx, mech.spry+4)
 	
 	--character
-	if(char.aiming) then
-		spr(65, char.x, char.y, 1, 1, char.flipx)
-		spr(96, char.x, char.y+8, 1, 1, char.flipx)
-	else
-		spr(64+frames1[frame+1], char.x, char.y, 1, 2, char.flipx)
+	if(not char.inside) then
+		if(char.aiming) then
+			spr(65, char.x, char.y, 1, 1, char.flipx)
+			spr(96, char.x, char.y+8, 1, 1, char.flipx)
+		else
+			spr(64+frames1[frame+1], char.x, char.y, 1, 2, char.flipx)
+		end
 	end
 
 	for enemy in all(enemies) do
@@ -311,14 +370,14 @@ __gfx__
 00ffff0000fcfc0000fcfc0000fcfc0000ffff006666600000dddd000555500000000000000000000bbbb0000bbbb0000bbbb000000000000040040005aa5550
 000ff00000ffff0000ffff0000ffff00000ff00066666000000dddd00055550000000000000000000bb0b0000bbbb0000bb0b00000000000004444000d5aa5d0
 00c55000000ff000000ff000000ff00000c55000666666000000dddd0005550000000000000000000000b0000bb0b0000000b00000000000004004000dd55ad0
-0cc5510000c550000cc5500000c5500000c551006666660000000ddd000055000000cc0000000000003bb000003bb000003bb000000000000000000000000000
-0cc551000ccc51000cc5510000c551000c55510066666600000000dd0005500000000cc00000000000b3b00000b3b00000b3b000000000000000000000000000
-0c55510000ccc10000cc510000cc5100cc5551006666660000000dd00055000000000ccc000000000bb3b0000bb3b0000bb3b000000000000000000000000000
-00333300005c510000c5510000c551000c555100666666000000dd000550000000000ccc000000000bb3b0000bb3b0000bb3b000000000000000000000000000
-003333300033333000333330003330000033330066666600000dd0005500000000000ccc000000000bbbb0000bbbb0000bbbb000000000000000000000000000
-00330330333333300033333303333000003333006666660000dd00005555500000000ccc0000000000b0b00000b0b00000b0b000000000000000000000000000
-00330330333003300330003303333300003333000666600000ddddd00000000000000cc0000000000b000b0000bb0000bb00b000000000000000000000000000
-0033033000000330033000000000330000333000000000000000000000000000000000c0000000000b000b00000b00000000b000000000000000000000000000
+0cc5510000c550000cc5500000c5500000c551006666660000000ddd000055000000cc000c000000003bb000003bb000003bb000000000000000000000000000
+0cc551000ccc51000cc5510000c551000c55510066666600000000dd0005500000000cc00cc0000000b3b00000b3b00000b3b000000000000000000000000000
+0c55510000ccc10000cc510000cc5100cc5551006666660000000dd00055000000000cccccc000000bb3b0000bb3b0000bb3b000000000000000000000000000
+00333300005c510000c5510000c551000c555100666666000000dd000550000000000cccccc000000bb3b0000bb3b0000bb3b000000000000000000000000000
+003333300033333000333330003330000033330066666600000dd0005500000000000cccccc000000bbbb0000bbbb0000bbbb000000000000000000000000000
+00330330333333300033333303333000003333006666660000dd00005555500000000cccccc0000000b0b00000b0b00000b0b000000000000000000000000000
+00330330333003300330003303333300003333000666600000ddddd00000000000000cc00cc000000b000b0000bb0000bb00b000000000000000000000000000
+0033033000000330033000000000330000333000000000000000000000000000000000c000cc00000b000b00000b00000000b000000000000000000000000000
 0cc55000000000000000000000000000000000000000000000000000000000000000000000000000000090000000000000000000000000000000000000000000
 0cccc550000009800000000000000000000000000000000000000000000000000000000000000000aa9900000000000000000000000000000000000000000000
 00ccc100000000000000000000000000000000000000000000000000000000000000000000000000aaa000000000000000000000000000000000000000000000
