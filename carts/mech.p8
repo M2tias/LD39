@@ -9,9 +9,6 @@ TODO
 - Animate shooting
 - Animate walking
 - Animate char's walking
-- Overground enemies walk when visible
-- Underground enemies need collision detection
-	+ They shouldn't drop from ledges either
 - Picking up batteries
 - Jumping into the mech
 - Levels
@@ -19,6 +16,13 @@ TODO
 	+ Battery should last if good strat is used
 
 - P A R T I C L E S
+
+DONE?
+----------------
+- Overground enemies walk when visible
+- Underground enemies need collision detection
+	+ They shouldn't drop from ledges either
+
 ]]--
 
 char = {}
@@ -45,7 +49,7 @@ mech.x = 0
 mech.y = 0
 mech.sprx = 20
 mech.spry = 11
-mech.battery = 10
+mech.battery = 1
 mech.hull = 10
 mech.inv_time = 2
 mech.inv_timer = 0
@@ -75,86 +79,13 @@ function _update()
 	end
 	--mech.battery = mech.battery - 0.05
 	if(intro) then
-		create_ground_enemies()
+		--create_ground_enemies()
 		intro = false
 	else
 		mech_update(current_t)
 		char_update(current_t)
-
-		--bullet update
-		for bullet in all(bullets) do
-			--debug_text = bullet.dir 
-			if(bullet.dir) then
-				bullet.x = bullet.x - 2
-			else
-				bullet.x = bullet.x + 2
-			end
-
-			-- delete bullets that are not visible
-			if(bullet.x < cam.x or bullet.x > (cam.x + 128)) then
-				del(bullets, bullet)
-			end
-		end
-
-		--enemy update
-		for enemy in all(enemies) do
-			-- move enemies if they are underground (always move) or visible
-			if(enemy.underground or (enemy.x > cam.x and enemy.x < cam.x+128 and enemy.y > cam.y and enemy.y < cam.y+128)) then
-				enemy.x = enemy.x - 0.5
-				if(enemy.underground) then
-					--TODO: detect collisions
-				end
-			end
-
-			-- char collision
-			-- todo: upper head doesn't seem to collide?
-			if(not char.inside) then
-				if(char.x+4 > enemy.x and char.x+4 < enemy.x+8) then
-					if((enemy.y > char.y and enemy.y < char.y+16) or (enemy.y + enemy.height > char.y and enemy.y + enemy.height < char.y+16)) then
-						char_take_damage()
-					end
-				end
-			end
-
-			-- mech collision
-			if(mech.sprx+4 > enemy.x and mech.sprx+4 < enemy.x+8) then
-				if((enemy.y > mech.spry and enemy.y < mech.spry+mech.height) or (enemy.y + enemy.height > mech.spry and enemy.y + enemy.height < mech.spry+mech.height)) then
-					mech_take_damage()
-				end
-			end
-
-
-			-- checking bullet collisions here
-			-- probably less bullets than enemies
-			for bullet in all(bullets) do
-				if(bullet.x+6 > enemy.x+2 and bullet.x+5 < (enemy.x+8)) then
-					if(bullet.y+1 > enemy.y and bullet.y+1 < enemy.y+8*enemy.height) then
-						del(enemies, enemy)
-						del(bullets, bullet)
-						sfx(2)
-					end
-				end
-			end
-
-			for rocket in all(rockets) do
-				if(rocket.explode) then
-					local rx = rocket.x + rocket.dx
-					local ry = rocket.y + rocket.dy
-					debug_r = {x1 = rx-10, y1 = ry-17, x2 = rx+10, y2 = ry+5}
-					if(rx-10 < enemy.x+4 and rx+10 > enemy.x+4) then
-						if(ry-17 < enemy.y+4 and ry+5 > enemy.y+4) then
-							del(enemies, enemy)
-						end
-					end
-				end
-			end
-		end
-
-		for rocket in all(rockets) do
-			if(rocket.explode) then
-				del(rockets, rocket)
-			end
-		end
+		other_update()
+		bullet_update()
 	end
 end
 
@@ -225,12 +156,125 @@ function char_update(current_t)
 	char.y = char.y + char.speed.y
 end
 
+function bullet_update()
+	--bullet update
+	for bullet in all(bullets) do
+		--debug_text = bullet.dir 
+		if(bullet.dir) then
+			bullet.x = bullet.x - 2
+		else
+			bullet.x = bullet.x + 2
+		end
+
+		-- delete bullets that are not visible
+		if(bullet.x < cam.x or bullet.x > (cam.x + 128)) then
+			del(bullets, bullet)
+		end
+	end
+end
+
+function other_update()
+	--enemy update
+	for enemy in all(enemies) do
+		-- move enemies if they are underground (always move) or visible
+		if(enemy.underground or (enemy.x > cam.x and enemy.x < cam.x+128 and enemy.y > cam.y and enemy.y < cam.y+128)) then
+			debug_text = enemy.underground
+			if(enemy.underground) then
+				if(not enemy.dir) then
+					-- check for opposing wall
+					local lflag = get_flag(enemy.x-1, enemy.y+2, 0)
+
+					if(not lflag) then
+						enemy.x = enemy.x - 0.5
+					else
+						enemy.dir = true
+					end
+
+					-- check if there's ledge
+					lflag = get_flag(enemy.x-1, enemy.y+9, 0)
+
+					if(not lflag) then
+						enemy.dir = true
+					else
+						enemy.x = enemy.x - 0.5
+					end
+				else
+					local rflag = get_flag(enemy.x+6, enemy.y+2, 0)
+
+					if(not rflag) then
+						enemy.x = enemy.x + 0.5
+					else
+						enemy.dir = false
+					end
+
+					rflag = get_flag(enemy.x+6, enemy.y+9, 0)
+
+					if(not rflag) then
+						enemy.dir = false
+					else
+						enemy.x = enemy.x + 0.5
+					end
+				end
+				--TODO: detect collisions
+			else
+				enemy.x = enemy.x - 0.5
+			end
+		end
+
+		-- char collision
+		-- todo: upper head doesn't seem to collide?
+		if(not char.inside) then
+			if(char.x+4 > enemy.x and char.x+4 < enemy.x+8) then
+				if((enemy.y > char.y and enemy.y < char.y+16) or (enemy.y + enemy.height > char.y and enemy.y + enemy.height < char.y+16)) then
+					char_take_damage()
+				end
+			end
+		end
+
+		-- mech collision
+		if(mech.sprx+4 > enemy.x and mech.sprx+4 < enemy.x+8) then
+			if((enemy.y > mech.spry and enemy.y < mech.spry+mech.height) or (enemy.y + enemy.height > mech.spry and enemy.y + enemy.height < mech.spry+mech.height)) then
+				mech_take_damage()
+			end
+		end
+
+
+		-- checking bullet collisions here
+		-- probably less bullets than enemies
+		for bullet in all(bullets) do
+			if(bullet.x+6 > enemy.x+2 and bullet.x+5 < (enemy.x+8)) then
+				if(bullet.y+1 > enemy.y and bullet.y+1 < enemy.y+8*enemy.height) then
+					del(enemies, enemy)
+					del(bullets, bullet)
+					sfx(2)
+				end
+			end
+		end
+
+		for rocket in all(rockets) do
+			if(rocket.explode) then
+				local rx = rocket.x + rocket.dx
+				local ry = rocket.y + rocket.dy
+				debug_r = {x1 = rx-10, y1 = ry-17, x2 = rx+10, y2 = ry+5}
+				if(rx-10 < enemy.x+4 and rx+10 > enemy.x+4) then
+					if(ry-17 < enemy.y+4 and ry+5 > enemy.y+4) then
+						del(enemies, enemy)
+					end
+				end
+			end
+		end
+	end
+
+	for rocket in all(rockets) do
+		if(rocket.explode) then
+			del(rockets, rocket)
+		end
+	end
+end
+
 function char_gravity()
 	-- gravity doesn't work on ladders
-	local lx = char.x + 4
-	local ly = char.y + 15
-	local laddertile = mget(lx/8, ly/8)
-	local ladder = fget(laddertile, 1)
+	local ladder = get_flag(char.x+4, char.y+15, 1)
 	--debug_text = ladder
 	if(ladder) then
 		char.speed.y = 0
@@ -238,10 +282,7 @@ function char_gravity()
 	end
 
 	-- gravity
-	local x = char.x
-	local y = char.y
-	local tile = mget((x+4)/8, (flr(y)+16)/8)
-	local flag = fget(tile, 0)
+	local flag = get_flag(char.x+4, flr(char.y)+16, 0)
 	--debug_text = char.speed.y
 	if(flag and char.speed.y >= 0) then
 		char.speed.y = 0
@@ -253,11 +294,8 @@ function char_gravity()
 end
 
 function char_up()
-	local x = char.x + 4
-	local y = char.y + 15
-	--debug_p = {x = x, y = y}
-	local tile = mget(x/8, y/8)
-	local ladder = fget(tile, 1)
+	local ladder = get_flag(char.x+4, char.y+15, 1)
+	
 	if(ladder) then
 		char.y = char.y - 1
 	elseif(not char.jump) then
@@ -268,12 +306,8 @@ function char_up()
 end
 
 function char_down()
-	local x = char.x + 4
-	local y = char.y + 15
-	--debug_p = {x = x, y = y}
-	local tile = mget(x/8, y/8)
-	local ladder = fget(tile, 1)
-	--debug_text = ladder
+	local ladder = get_flag(char.x+4, char.y+15, 1)
+
 	if(ladder) then
 		char.y = char.y + 1
 	else
@@ -283,12 +317,10 @@ end
 
 function char_walls()
 	local x = char.x
-	local y = char.y + 8 -- player's lower body
 	-- char x speed works as a direction
 	-- as it's always either -1 or 1
 	local dir = 4+char.speed.x*4
-	local tile = mget((x+dir)/8, (y)/8)
-	local flag = fget(tile, 0)
+	local flag = get_flag(x+dir, char.y+8, 0)
 	
 	if(flag) then
 		char.speed.x = 0
@@ -296,10 +328,7 @@ function char_walls()
 end
 
 function char_top()
-	local x = char.x+4
-	local y = char.y+4
-	local tile = mget(x/8, flr(y)/8)
-	local flag = fget(tile, 0)
+	local flag = get_flag(char.x+4, flr(char.y+4), 0)
 	
 	if(flag and char.jump) then
 		char.speed.y = 1
@@ -307,10 +336,7 @@ function char_top()
 end
 
 function char_spikes()
-	local x = char.x+4
-	local y = char.y+14
-	local tile = mget(x/8, y/8)
-	local flag = fget(tile, 3)
+	local flag = get_flag(char.x+4, char.y+14, 3)
 
 	if(flag) then
 		char_take_damage()
@@ -379,7 +405,7 @@ function rocket_path(rocket)
 		rocket.explode = true
 		local rx = rocket.x + rocket.dx
 		local ry = rocket.y + rocket.dy
-		debug_p = {x = rx, y = ry}
+		--debug_p = {x = rx, y = ry}
 		return {x = 200, y = 200, dx = 200, dy = 200}
 	end
 
@@ -413,6 +439,12 @@ function create_ground_enemies()
 	add(enemies, enemy)
 	local enemy = {x = 160, y = 16, dir = false, frame = 0, maxframes = 3, dir = false, height = 2, animated = true, sprite = 74, underground = false}
 	add(enemies, enemy)
+end
+
+function get_flag(x, y, flag)
+	local tile = mget(x/8, y/8)
+	local flag = fget(tile, flag)
+	return flag
 end
 
 function _draw()
