@@ -1,6 +1,19 @@
 pico-8 cartridge // http://www.pico-8.com
 version 8
 __lua__
+--[[]
+TODO
+---------
+- Draw bullets for mech (use the same as char?)
+
+- Animate shooting
+- Animate walking
+- Animate char's walking
+- Fix char's shooting frame, make it show longer
+- If collision doesn't work for mech's bullet, fix them
+- P A R T I C L E S
+]]--
+
 char = {}
 char.x = 50
 char.y = 5
@@ -14,6 +27,7 @@ char.hp = 10
 char.inv_time = 2
 char.inv_timer = 0
 char.invulnerable = false
+char.shootframes = 0
 
 cam = {}
 cam.x = 64
@@ -33,10 +47,11 @@ mech.invulnerable = false
 mech.height = 16 -- todo: check this value
 
 bullets = {} -- {x, y, dir}
+rockets = {} -- {x, y, dx, dy, step, explode}
 enemies = {} -- {x, y, frame, maxframes, height, dir, animated, sprite}
 
 
-intro = false
+intro = true
 music_ = true
 
 frames1 = {0, 1, 2, 3, 4}
@@ -44,6 +59,7 @@ frames2 = {0, 1, 2, 3, 4}
 frame = 0
 step = 0
 debug_p = {x = 0, y = 0}
+debug_r = {x1 = 0, y1 = 0, x2 = 0, y2 = 0}
 
 function _update()
 	local current_t = time()
@@ -51,8 +67,10 @@ function _update()
 		music_ = true
 		music(0)
 	end
-	mech.battery = mech.battery - 0.1
+	--mech.battery = mech.battery - 0.05
 	if(intro) then
+		create_ground_enemies()
+		intro = false
 	else
 		mech_update(current_t)
 		char_update(current_t)
@@ -74,7 +92,7 @@ function _update()
 
 		--enemy update
 		for enemy in all(enemies) do
-			enemy.x = enemy.x - 0.5
+			--enemy.x = enemy.x - 0.5
 			-- char collision
 			-- todo: upper head doesn't seem to collide?
 			if(not char.inside) then
@@ -104,14 +122,38 @@ function _update()
 					end
 				end
 			end
+
+			for rocket in all(rockets) do
+				if(rocket.explode) then
+					local rx = rocket.x + rocket.dx
+					local ry = rocket.y + rocket.dy
+					debug_r = {x1 = rx-10, y1 = ry-17, x2 = rx+10, y2 = ry+5}
+					if(rx-10 < enemy.x+4 and rx+10 > enemy.x+4) then
+						if(ry-17 < enemy.y+4 and ry+5 > enemy.y+4) then
+							del(enemies, enemy)
+						end
+					end
+				end
+			end
+		end
+
+		for rocket in all(rockets) do
+			if(rocket.explode) then
+				del(rockets, rocket)
+			end
 		end
 	end
 end
 
 function mech_update(current_t)
 	if(mech.battery > 0 and char.inside) then
-		mech.sprx = mech.sprx + 1
-		-- todo: shooting etc
+		mech.sprx = mech.sprx + 0.33
+		if(btnp(4, 0)) then
+			mech_shoot()
+		elseif(btnp(5, 0)) then
+			create_underground_enemy()
+			mech_rockets()
+		end
 	elseif(char.inside) then
 		char.x = mech.sprx+5
 		char.y = mech.spry
@@ -285,8 +327,53 @@ end
 
 function char_shoot()
 	add(bullets, {x = char.x, y = char.y+8, dir = char.flipx})
+	char.shootframes = 3
 	sfx(1)
-end 
+end
+
+function mech_shoot()
+	add(bullets, {x = mech.sprx, y = mech.spry+7, dir = false})
+	sfx(1)
+	mech.battery = mech.battery - 1
+end
+
+function mech_rockets()
+	add(rockets, {x = mech.sprx, y = mech.spry+1, dx = mech.sprx + 100, dy = mech.spry-mech.height, step = 1, explode = false})
+	sfx(1)
+	mech.battery = mech.battery - 2
+end
+
+function rocket_path(rocket)
+	paths = {
+		{x = 0, y = 0, dx = 0, dy = -3},
+		{x = 2, y = -5, dx = 4, dy = -7},
+		{x = 6, y = -9, dx = 10, dy = -11},
+		{x = 12, y = -10, dx = 18, dy = -10},
+		{x = 24, y = -9, dx = 30, dy = -8},
+		{x = 30, y = -8, dx = 36, dy = -7},
+		{x = 40, y = -6, dx = 44, dy = -5},
+		{x = 48, y = -4, dx = 52, dy = -2},
+		{x = 56, y = -1, dx = 60, dy = 0},
+		{x = 64, y = 1, dx = 68, dy = 2},
+		{x = 70, y = 4, dx = 72, dy = 6},
+		{x = 74, y = 8, dx = 76, dy = 10},
+		{x = 78, y = 12, dx = 80, dy = 14},
+		{x = 82, y = 17, dx = 84, dy = 20}
+	}
+	if(rocket.step > #paths) then
+		rocket.dx = paths[#paths].dx
+		rocket.dy = paths[#paths].dy
+		rocket.explode = true
+		local rx = rocket.x + rocket.dx
+		local ry = rocket.y + rocket.dy
+		debug_p = {x = rx, y = ry}
+		return {x = 200, y = 200, dx = 200, dy = 200}
+	end
+
+	local coordinates = paths[rocket.step]
+	rocket.step = rocket.step + 1
+	return coordinates
+end
 
 function create_ground_enemy()
 	local enemy = {x = 10+char.x, y = char.y, dir = false, frame = 0, maxframes = 3, dir = false, height = 2, animated = true, sprite = 74}
@@ -295,6 +382,23 @@ end
 
 function create_underground_enemy()
 	local enemy = {x = 10+char.x, y = char.y+8, dir = false, frame = 0, maxframes = 3, dir = false, height = 1, animated = true, sprite = 106}
+	add(enemies, enemy)
+end
+
+function create_ground_enemies()
+	local enemy = {x = 100, y = 16, dir = false, frame = 0, maxframes = 3, dir = false, height = 2, animated = true, sprite = 74}
+	add(enemies, enemy)
+	local enemy = {x = 120, y = 16, dir = false, frame = 0, maxframes = 3, dir = false, height = 2, animated = true, sprite = 74}
+	add(enemies, enemy)
+	local enemy = {x = 140, y = 16, dir = false, frame = 0, maxframes = 3, dir = false, height = 2, animated = true, sprite = 74}
+	add(enemies, enemy)
+	local enemy = {x = 150, y = 16, dir = false, frame = 0, maxframes = 3, dir = false, height = 2, animated = true, sprite = 74}
+	add(enemies, enemy)
+	local enemy = {x = 155, y = 16, dir = false, frame = 0, maxframes = 3, dir = false, height = 2, animated = true, sprite = 74}
+	add(enemies, enemy)
+	local enemy = {x = 157, y = 16, dir = false, frame = 0, maxframes = 3, dir = false, height = 2, animated = true, sprite = 74}
+	add(enemies, enemy)
+	local enemy = {x = 160, y = 16, dir = false, frame = 0, maxframes = 3, dir = false, height = 2, animated = true, sprite = 74}
 	add(enemies, enemy)
 end
 
@@ -354,9 +458,10 @@ function game_draw()
 	end
 
 	if(not char.inside and char_inv_draw) then
-		if(char.aiming) then
+		if(char.aiming or char.shootframes > 0) then
 			spr(65, char.x, char.y, 1, 1, char.flipx)
 			spr(96, char.x, char.y+8, 1, 1, char.flipx)
+			char.shootframes = char.shootframes - 1
 		else
 			spr(64+frames1[frame+1], char.x, char.y, 1, 2, char.flipx)
 		end
@@ -377,6 +482,17 @@ function game_draw()
 		spr(97, bullet.x, bullet.y, 1, 1, bullet.dir)
 	end
 
+	for rocket in all(rockets) do
+		local c = rocket_path(rocket)
+		line(rocket.x + c.x, rocket.y + c.y, rocket.x + c.dx, rocket.y + c.dy, 8)
+	end
+	
+	--debug
+	-----------------------------------
+	pset(debug_p.x, debug_p.y, 8)
+	rect(debug_r.x1, debug_r.y1, debug_r.x2, debug_r.y2, 8)
+	-----------------------------------
+
 	--spr(80+frames2[frame+1], char.x, 88, flip)
 	camera()
 	
@@ -394,6 +510,11 @@ function game_draw()
 	spr(119, 96, 120)
 	spr(120, 120, 120)
 
+	--debug
+	-----------------------------------
+	print(debug_text, 100, 110, 7)
+	-----------------------------------
+
 	if(mech.battery > 0) then
 		local color = 8 + flr((mech.battery)/2.5)
 		pal(8, color)
@@ -406,10 +527,6 @@ function game_draw()
 	if(char.hp > 0) then
 		sspr(8*2, 8*7, 8, 8, 52, 8*15, char.hp*2, 8)
 	end
-	
-	--debug
-	print(debug_text, 100, 110, 7)
-	pset(debug_p.x, debug_p.y, 8)
 end
 __gfx__
 00000000566566556565655654444444444444444040400440440044000000000000000000000000000000000000000000000000000000000000000000000000
