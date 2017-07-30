@@ -9,8 +9,15 @@ TODO
 - Animate shooting
 - Animate walking
 - Animate char's walking
-- Fix char's shooting frame, make it show longer
-- If collision doesn't work for mech's bullet, fix them
+- Overground enemies walk when visible
+- Underground enemies need collision detection
+	+ They shouldn't drop from ledges either
+- Picking up batteries
+- Jumping into the mech
+- Levels
+	+ Good spacing
+	+ Battery should last if good strat is used
+
 - P A R T I C L E S
 ]]--
 
@@ -33,7 +40,6 @@ cam = {}
 cam.x = 64
 cam.y = 64
 
--- mech is both an entity and the pannin camera coordinates
 mech = {}
 mech.x = 0
 mech.y = 0
@@ -48,7 +54,7 @@ mech.height = 16 -- todo: check this value
 
 bullets = {} -- {x, y, dir}
 rockets = {} -- {x, y, dx, dy, step, explode}
-enemies = {} -- {x, y, frame, maxframes, height, dir, animated, sprite}
+enemies = {} -- {x, y, frame, maxframes, height, dir, animated, sprite, underground}
 
 
 intro = true
@@ -92,7 +98,14 @@ function _update()
 
 		--enemy update
 		for enemy in all(enemies) do
-			--enemy.x = enemy.x - 0.5
+			-- move enemies if they are underground (always move) or visible
+			if(enemy.underground or (enemy.x > cam.x and enemy.x < cam.x+128 and enemy.y > cam.y and enemy.y < cam.y+128)) then
+				enemy.x = enemy.x - 0.5
+				if(enemy.underground) then
+					--TODO: detect collisions
+				end
+			end
+
 			-- char collision
 			-- todo: upper head doesn't seem to collide?
 			if(not char.inside) then
@@ -376,29 +389,29 @@ function rocket_path(rocket)
 end
 
 function create_ground_enemy()
-	local enemy = {x = 10+char.x, y = char.y, dir = false, frame = 0, maxframes = 3, dir = false, height = 2, animated = true, sprite = 74}
+	local enemy = {x = 10+char.x, y = char.y, dir = false, frame = 0, maxframes = 3, dir = false, height = 2, animated = true, sprite = 74, underground = false}
 	add(enemies, enemy)
 end
 
 function create_underground_enemy()
-	local enemy = {x = 10+char.x, y = char.y+8, dir = false, frame = 0, maxframes = 3, dir = false, height = 1, animated = true, sprite = 106}
+	local enemy = {x = 10+char.x, y = char.y+8, dir = false, frame = 0, maxframes = 3, dir = false, height = 1, animated = true, sprite = 106, underground = true}
 	add(enemies, enemy)
 end
 
 function create_ground_enemies()
-	local enemy = {x = 100, y = 16, dir = false, frame = 0, maxframes = 3, dir = false, height = 2, animated = true, sprite = 74}
+	local enemy = {x = 100, y = 16, dir = false, frame = 0, maxframes = 3, dir = false, height = 2, animated = true, sprite = 74, underground = false}
 	add(enemies, enemy)
-	local enemy = {x = 120, y = 16, dir = false, frame = 0, maxframes = 3, dir = false, height = 2, animated = true, sprite = 74}
+	local enemy = {x = 120, y = 16, dir = false, frame = 0, maxframes = 3, dir = false, height = 2, animated = true, sprite = 74, underground = false}
 	add(enemies, enemy)
-	local enemy = {x = 140, y = 16, dir = false, frame = 0, maxframes = 3, dir = false, height = 2, animated = true, sprite = 74}
+	local enemy = {x = 140, y = 16, dir = false, frame = 0, maxframes = 3, dir = false, height = 2, animated = true, sprite = 74, underground = false}
 	add(enemies, enemy)
-	local enemy = {x = 150, y = 16, dir = false, frame = 0, maxframes = 3, dir = false, height = 2, animated = true, sprite = 74}
+	local enemy = {x = 150, y = 16, dir = false, frame = 0, maxframes = 3, dir = false, height = 2, animated = true, sprite = 74, underground = false}
 	add(enemies, enemy)
-	local enemy = {x = 155, y = 16, dir = false, frame = 0, maxframes = 3, dir = false, height = 2, animated = true, sprite = 74}
+	local enemy = {x = 155, y = 16, dir = false, frame = 0, maxframes = 3, dir = false, height = 2, animated = true, sprite = 74, underground = false}
 	add(enemies, enemy)
-	local enemy = {x = 157, y = 16, dir = false, frame = 0, maxframes = 3, dir = false, height = 2, animated = true, sprite = 74}
+	local enemy = {x = 157, y = 16, dir = false, frame = 0, maxframes = 3, dir = false, height = 2, animated = true, sprite = 74, underground = false}
 	add(enemies, enemy)
-	local enemy = {x = 160, y = 16, dir = false, frame = 0, maxframes = 3, dir = false, height = 2, animated = true, sprite = 74}
+	local enemy = {x = 160, y = 16, dir = false, frame = 0, maxframes = 3, dir = false, height = 2, animated = true, sprite = 74, underground = false}
 	add(enemies, enemy)
 end
 
