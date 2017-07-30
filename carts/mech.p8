@@ -158,7 +158,7 @@ function mech_update(current_t)
 		if(btnp(4, 0)) then
 			mech_shoot()
 		elseif(btnp(5, 0)) then
-			create_underground_enemy()
+			--create_underground_enemy()
 			mech_rockets()
 		end
 	elseif(char.inside) then
@@ -318,8 +318,8 @@ function other_update()
 			if(rocket.explode) then
 				local rx = rocket.x + rocket.dx
 				local ry = rocket.y + rocket.dy
-				debug_r = {x1 = rx-10, y1 = ry-17, x2 = rx+10, y2 = ry+5}
-				if(rx-10 < enemy.x+4 and rx+10 > enemy.x+4) then
+				debug_r = {x1 = rx-12, y1 = ry-17, x2 = rx+12, y2 = ry+5}
+				if(rx-12 < enemy.x+4 and rx+12 > enemy.x+4) then
 					if(ry-17 < enemy.y+4 and ry+5 > enemy.y+4) then
 						del(enemies, enemy)
 					end
@@ -449,19 +449,19 @@ end
 function rocket_path(rocket)
 	paths = {
 		{x = 0, y = 0, dx = 0, dy = -3},
-		{x = 2, y = -5, dx = 4, dy = -7},
-		{x = 6, y = -9, dx = 10, dy = -11},
-		{x = 12, y = -10, dx = 18, dy = -10},
-		{x = 24, y = -9, dx = 30, dy = -8},
-		{x = 30, y = -8, dx = 36, dy = -7},
-		{x = 40, y = -6, dx = 44, dy = -5},
-		{x = 48, y = -4, dx = 52, dy = -2},
-		{x = 56, y = -1, dx = 60, dy = 0},
-		{x = 64, y = 1, dx = 68, dy = 2},
-		{x = 70, y = 4, dx = 72, dy = 6},
-		{x = 74, y = 8, dx = 76, dy = 10},
-		{x = 78, y = 12, dx = 80, dy = 14},
-		{x = 82, y = 17, dx = 84, dy = 20}
+		{x = 1, y = -5, dx = 3, dy = -7},
+		{x = 4, y = -9, dx = 7, dy = -11},
+		{x = 9, y = -10, dx = 13, dy = -10},
+		{x = 18, y = -9, dx = 22, dy = -8},
+		{x = 22, y = -8, dx = 27, dy = -7},
+		{x = 30, y = -6, dx = 33, dy = -5},
+		{x = 36, y = -4, dx = 39, dy = -2},
+		{x = 42, y = -1, dx = 45, dy = 0},
+		{x = 48, y = 1, dx = 51, dy = 2},
+		{x = 52, y = 4, dx = 54, dy = 6},
+		{x = 55, y = 8, dx = 57, dy = 10},
+		{x = 58, y = 12, dx = 60, dy = 14},
+		{x = 61, y = 17, dx = 63, dy = 20}
 	}
 	if(rocket.step > #paths) then
 		rocket.dx = paths[#paths].dx
@@ -599,10 +599,6 @@ function game_draw()
 	for rocket in all(rockets) do
 		local c = rocket_path(rocket)
 		line(rocket.x + c.x, rocket.y + c.y, rocket.x + c.dx, rocket.y + c.dy, 8)
-	end
-
-	for battery in all(batteries) do
-		spr(79, battery.x, battery.y)
 	end
 	
 	-- debug
