@@ -10,7 +10,7 @@
 // :: Video Settings
 
 video_mode 580 540 // screen width, height
-show_fps 0 // Draw frames per second in the corner
+show_fps 1 // Draw frames per second in the corner
 
 
 // :: Window Settings
@@ -24,7 +24,7 @@ fullscreen_method 1 // 0 maximized window (linux)  1 borderless desktop-sized wi
 // :: System Settings
 
 frame_sleep_ms 5 // number of milli seconds to sleep each frame. To save laptop battery power, try 20
-sessions 422 // number of times program has been run
+sessions 475 // number of times program has been run
 
 // (scancode) hold this key down and left-click to simulate right-click
 rmb_key 0 // 0 for none  226 for LALT
@@ -39,15 +39,15 @@ mix_buffer_size 1024 // usually 1024. Try 2048 if you get choppy sound
 
 // :: 
 
-version 0.1.10c
+version 0.1.9b
 
 
 // Location of pico-8's root folder
-root_path c:/Projects/LD39/carts/
+root_path c:/Projects/pico8/LD39/carts/
 
 
 // Location of cartridge save data
-cdata_path c:/Projects/LD39/cdata/
+cdata_path c:/Projects/pico8/LD39/cdata/
 
 
 // Specify which player index joystick control begins at (0..7)
