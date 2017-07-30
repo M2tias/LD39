@@ -6,14 +6,10 @@ todo
 ---------
 - draw bullets for mech (use the same as char?)
 
-- animate shooting
-- animate walking
-- animate char's walking
-- picking up batteries
-- jumping into the mech
 - levels
 	+ good spacing
 	+ battery should last if good strat is used
+- overground enemies don't stay grouped up when coming to the screen
 
 - p a r t i c l e s
 
@@ -22,6 +18,11 @@ done?
 - overground enemies walk when visible
 - underground enemies need collision detection
 	+ they shouldn't drop from ledges either
+- jumping into the mech
+- picking up batteries
+- animate char's walking
+- animate shooting, mech --BUGGED to hell
+- animate walking, mech
 
 ]]--
 
@@ -39,6 +40,7 @@ char.inv_time = 2
 char.inv_timer = 0
 char.invulnerable = false
 char.shootframes = 0
+char.frame = 0
 
 cam = {}
 cam.x = 64
@@ -55,6 +57,23 @@ mech.inv_time = 2
 mech.inv_timer = 0
 mech.invulnerable = false
 mech.height = 16 -- todo: check this value
+mech.frame = 0
+mech.shooting = false
+
+mech.frames = {
+	fleg = {
+		x = {0, -1, -1, 0, 1, 2, 2, 1},
+		y = {0,  0, -1,-1,-1,-1, 0, 0}
+	},
+	bleg = {
+		x = { 0, 1, 2, 2, 1, 0, -1, -1},
+		y = {-1,-1,-1, 0, 1, 0,  0, -1}
+	},
+	gun = {
+		x = {-1, -4, -4, -4, -3, -2, -1},
+		frame = 0 -- if frame == #gun.x, we'll leave the animation
+	}
+}
 
 bullets = {} -- {x, y, dir}
 rockets = {} -- {x, y, dx, dy, step, explode}
@@ -69,6 +88,7 @@ frames1 = {0, 1, 2, 3, 4}
 frames2 = {0, 1, 2, 3, 4}
 frame = 0
 step = 0
+fstep = 0
 debug_p = {x = 0, y = 0}
 debug_r = {x1 = 0, y1 = 0, x2 = 0, y2 = 0}
 
@@ -149,6 +169,7 @@ function _update()
 		char_update(current_t)
 		other_update()
 		bullet_update()
+		debug_text = mech.battery
 	end
 end
 
@@ -204,7 +225,9 @@ function char_update(current_t)
 		char.aiming = true
 		char_shoot()
 	elseif(btnp(5, 0)) then
-		create_underground_enemy()
+		--create_underground_enemy()
+		pick_up_battery()
+		jump_in()
 	end
 
 	if(current_t - char.inv_timer >= char.inv_time) then
@@ -240,8 +263,8 @@ function other_update()
 	--enemy update
 	for enemy in all(enemies) do
 		-- move enemies if they are underground (always move) or visible
-		if(enemy.underground or (enemy.x > cam.x and enemy.x < cam.x+128 and enemy.y > cam.y and enemy.y < cam.y+128)) then
-			debug_text = enemy.underground
+		if(enemy.underground or (enemy.x > cam.x and enemy.x < cam.x+128 and enemy.y > cam.y+28 and enemy.y < cam.y+128)) then
+			--debug_text = enemy.underground
 			if(enemy.underground) then
 				if(not enemy.dir) then
 					-- check for opposing wall
@@ -438,12 +461,14 @@ function mech_shoot()
 	add(bullets, {x = mech.sprx, y = mech.spry+7, dir = false})
 	sfx(1)
 	mech.battery = mech.battery - 1
+	mech.shooting = true
 end
 
 function mech_rockets()
 	add(rockets, {x = mech.sprx, y = mech.spry+1, dx = mech.sprx + 100, dy = mech.spry-mech.height, step = 1, explode = false})
 	sfx(1)
 	mech.battery = mech.battery - 2
+	mech.shooting = true
 end
 
 function rocket_path(rocket)
@@ -476,6 +501,31 @@ function rocket_path(rocket)
 	local coordinates = paths[rocket.step]
 	rocket.step = rocket.step + 1
 	return coordinates
+end
+
+function pick_up_battery()
+	if(mech.battery >= 10) then return end
+	if(mech.battery < 0) then mech.battery = 0  end -- bugged somewhere?
+	
+	for battery in all(batteries) do
+		if(char.x+2 > battery.x and char.x+6 < battery.x+8) then
+			if(char.y+10 > battery.y and char.y+14 < battery.x+8) then
+				del(batteries, battery)
+				mech.battery = mech.battery + 3.5
+				if(mech.battery > 10) then mech.battery = 10 end
+			end
+		end
+	end
+end
+
+function jump_in()
+	if(mech.battery < 10) then return end
+
+	if(char.x+4 > mech.sprx and char.x+4 < mech.sprx+8) then
+		if(char.y > mech.spry and char.y < mech.spry+16) then
+			char.inside = true
+		end
+	end
 end
 
 function create_ground_enemy()
@@ -527,7 +577,7 @@ function game_draw()
 	cls()
 	mech.x = mech.x + 0.1
 	if(char.inside) then
-		cam.x = mech.sprx-40
+		cam.x = mech.sprx-20
 		cam.y = mech.spry-40
 		camera(cam.x, cam.y) -- todo hysteresis
 	else
@@ -540,23 +590,43 @@ function game_draw()
 	--map(mech.x, mech.y, 0, 0, 16, 16)
 	--debug/animation stuff
 	step = (step + 1) % 2
+	fstep = (fstep + 1) % 3
 	frame = (frame + step) % #frames1
 	
 	-- mech
 	local mech_inv_draw = true
+	
+	mech.frame = (mech.frame + mech_step(fstep)) % #mech.frames.fleg.x
 	if(mech.invulnerable and step == 0) then
 		mech_inv_draw = false
 	end
 	if(mech_inv_draw) then
-		spr(71, mech.sprx, mech.spry+7, 1, 2)
+		if(char.inside) then -- mech moves
+			spr(71, mech.sprx+mech.frames.bleg.x[mech.frame+1], mech.spry+7+mech.frames.bleg.y[mech.frame+1], 1, 2)
+		else
+			mech.frame = 0
+			spr(71, mech.sprx, mech.spry+7, 1, 2)
+		end
 		spr(69, mech.sprx, mech.spry, 1, 2)
 		if(char.inside) then
 			spr(88, mech.sprx, mech.spry)
 		else
 			spr(89, mech.sprx, mech.spry-8)
 		end
-		spr(70, mech.sprx, mech.spry+7, 1, 2)
-		spr(72, mech.sprx, mech.spry+4)
+		if(char.inside) then -- mech moves
+			spr(70, mech.sprx+mech.frames.fleg.x[mech.frame+1], mech.spry+7+mech.frames.fleg.y[mech.frame+1], 1, 2)
+		else
+			mech.frame = 0
+			spr(70, mech.sprx, mech.spry+7, 1, 2)
+		end
+		if(char.inside and (mech.shooting or mech.frames.gun.frame > 0) and mech.frames.gun.frame < #mech.frames.gun.x) then
+			spr(72, mech.sprx+mech.frames.gun.x[mech.frames.gun.frame+1], mech.spry+4)
+			mech.frames.gun.frame = mech.frames.gun.frame + fstep
+			mech.shooting = false
+		else
+			mech.frames.gun.frame = 0
+			spr(72, mech.sprx, mech.spry+4)
+		end
 		spr(73, mech.sprx-1, mech.spry-2)
 	end
 
@@ -577,7 +647,15 @@ function game_draw()
 			spr(96, char.x, char.y+8, 1, 1, char.flipx)
 			char.shootframes = char.shootframes - 1
 		else
-			spr(64+frames1[frame+1], char.x, char.y, 1, 2, char.flipx)
+			-- TODO: twitches at the highest point of jump
+			if(char.speed.x ~= 0 and not char.jump) then
+				char.frame = (char.frame + step) % #frames1
+				spr(64+frames1[char.frame+1], char.x, char.y, 1, 2, char.flipx)
+			elseif(char.speed.y ~= 0) then
+				spr(64+frames1[2], char.x, char.y, 1, 2, char.flipx)
+			else
+				spr(64+frames1[1], char.x, char.y, 1, 2, char.flipx)
+			end
 		end
 	end
 
@@ -630,9 +708,9 @@ function game_draw()
 	-----------------------------------
 
 	if(mech.battery > 0) then
-		local color = 8 + flr((mech.battery)/2.5)
+		local color = 8 + flr((mech.battery)/2.7)
 		pal(8, color)
-		sspr(8*2, 8*7, 8, 8, 16, 8*15, mech.battery*2, 8)
+		sspr(8*2, 8*7, 8, 8, 16, 8*15, flr(mech.battery)*2-1, 8)
 		pal(8, 8)
 	end
 	if(mech.hull > 0) then
@@ -642,6 +720,15 @@ function game_draw()
 		sspr(8*2, 8*7, 8, 8, 52, 8*15, char.hp*2, 8)
 	end
 end
+
+function mech_step(step)
+	if(step == 0) then
+		return 1
+	else
+		return 0
+	end
+end
+
 __gfx__
 00000000566566556565655654444444444444444040400440440044000000000000000000000000000000000000000000000000000000000000000000000000
 00000000655665655655566544544454445455444454445444545544000000000000000000000000000000000000000000000000000000000000000000000000
@@ -778,7 +865,7 @@ __gff__
 __map__
 0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000004a00004a4a0000004a4a4a0000000000000000000000000000000000004a4a4a00004a00004a4a4a0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000000004a0000004a4a00004a4a000000000000000000000000000000000000004a4a4a00004a00004a4a4a0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 0102010201010201020102020102010201114e21021200220201020102010201020112002201020102010201114e210201020102110022014e0102010202020102010201020201020102010201020102010201020102010201020102010201020102010201020102010201020102010201020102010201020102010201020102
 0304030404030403040304040304030403034e03040300030403040304030403040304000403040304030403044e040304040304030003044e0304030304040304030403040403040304030403040304030403040304030403040304030403040304030403040304030403040304030403040304030403040304030403040304
